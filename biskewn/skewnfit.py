@@ -1,0 +1,53 @@
+from CentralStreamingModel.utils.read_probabilities import VD
+from CentralStreamingModel.utils import fit_tools as fit
+from CentralStreamingModel.biskewn import skewnormal as sn
+import numpy as np
+
+def radial_tangential_read_skewnfit(boxsize, boxnumber, snapshot ):
+
+	#print('Fitting a biskewt distribution to measured radial and tangential velocity pdfs ...')
+	n_parameters = 4
+
+	velocity_statistics = VD(boxnumber, boxsize, snapshot)
+
+
+
+	v = np.array(np.meshgrid(velocity_statistics.v.r, velocity_statistics.v.t)).T.reshape(-1,2)
+	rbins = np.arange(50,np.max(velocity_statistics.r),velocity_statistics.wr,dtype=int)
+	popt = np.zeros((len(rbins),n_parameters))
+	pcov = np.zeros((len(rbins),n_parameters, n_parameters))
+
+	for rbin,rbin_value in enumerate(rbins):
+
+		initial_guess = np.asarray([1.,1.,1.,1.])
+
+
+		reshaped_pdf = velocity_statistics.jointpdf[rbin].reshape(-1)
+
+		popt[rbin,:], pcov[rbin,:,:] = fit.fit_pdf(sn.skewnormal, v,
+								   reshaped_pdf, initial_guess)
+
+
+	return popt, pcov
+
+def radial_tangential_skewtfit(r, v_r, v_t, jointpdf_rt ):
+
+	#print('Fitting a biskewt distribution to measured radial and tangential velocity pdfs ...')
+	n_parameters = 4
+
+	v = np.array(np.meshgrid(v_r, v_t)).T.reshape(-1,2)
+	popt = np.zeros((len(r),n_parameters))
+	pcov = np.zeros((len(r),n_parameters, n_parameters))
+
+	for rbin,rbin_value in enumerate(r):
+
+		initial_guess = np.asarray([1.,1.,1.,1.])
+
+		reshaped_pdf = jointpdf_rt[rbin].reshape(-1)
+
+
+		popt[rbin,:], pcov[rbin,:,:] = fit.fit_pdf(sn.skewnormal, v,
+								   reshaped_pdf, initial_guess)
+
+	return popt, pcov
+
