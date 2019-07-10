@@ -1,5 +1,5 @@
 from scipy.interpolate import interp1d
-from scipy.stats import multivariate_normal
+from scipy.stats import multivariate_normal, norm
 import numpy as np
 
 # Get moments measured from simulation -> interpolate them
@@ -41,4 +41,6 @@ def gaussian_rt_pdf(v,  mean_r, std_r, std_t):
 	return multivariate_normal.pdf(v, mean = mean, cov = omega)
 	
 
-	
+
+def gaussian(v, mean, std):
+	return norm.pdf(v, loc = mean, scale = std)

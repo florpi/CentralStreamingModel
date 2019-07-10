@@ -46,35 +46,6 @@ projection_lib.projection_vlos.argtypes = [
 projection_lib.projection_vlos.restype = None
 
 
-#************** RETURN PROJECTION AT VLOS *************#
-
-'''
-def projection(r, popt, r_perp, r_paral, vlos):
-
-
-	r = r.astype(ctypes.c_double)
-	n_r = len(r)
-
-	w_r = popt[:,0].astype(ctypes.c_double)
-	w_t = popt[:,1].astype(ctypes.c_double)
-	vr_c = popt[:,2].astype(ctypes.c_double)
-	alpha = popt[:,3].astype(ctypes.c_double)
-	k = popt[:,4].astype(ctypes.c_double)
-
-	result = projection_lib.projection(r_perp, r_paral, vlos, 
-							r, n_r, w_r, w_t, vr_c, alpha, k)
-	return result
-
-
-def skewt_los_pdf(r, popt):
-	
-	def skewt_pdf(r_perp, r_paral, v_los):
-
-		return projection(r, popt, r_perp, r_paral, v_los)
-
-	return skewt_pdf
-'''
-
 #************ RETURN PROJECTION AT ARRAY VLOS *************#
 
 def projection(r, popt, r_perp, r_paral, vlos):

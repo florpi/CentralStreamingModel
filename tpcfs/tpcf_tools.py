@@ -90,7 +90,7 @@ def compute_redshift_tpcf(filename, box, snapshot, r_bins, mu_bins = None,
 					'mono': mono, 'quad': quad, 'hexa': hexa}
 
     if save == True:
-         with open(f'/raid/c-cuesta/tpcfs/redshift/box{box}_s{snapshot:03d}.pickle',
+         with open(f'/raid/c-cuesta/tpcfs/redshift/box{box}_res2_s{snapshot:03d}.pickle',
 				  'wb') as fp:
 			
              pickle.dump(tpcf_dict, fp, protocol=pickle.HIGHEST_PROTOCOL)

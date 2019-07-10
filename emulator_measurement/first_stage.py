@@ -34,11 +34,13 @@ m_halo_min = np.sort(m200c)[-n_objects]
 
 # ii) Measure real and redshift space two point correlation functions,
 
+'''
 r_bins = np.logspace(-0.4, np.log10(150.), 300)
 tpcf_tools.compute_real_tpcf(data_dir + filename_root, box, snapshot,r_bins, num_threads = n_threads, m_min = m_halo_min)
-
 '''
-r_bins = np.arange(0., 50., 1.)
+
+#r_bins = np.arange(0., 50., 1.)
+r_bins = np.concatenate((np.arange(0.,10.,0.5), np.arange(10.,50.,1)))
 r_bins[0] = 0.0001
 n_mu_bins = 60
 mu_bins = np.linspace(0.,1.,n_mu_bins)
@@ -47,6 +49,5 @@ mu_bins = np.linspace(0.,1.,n_mu_bins)
 tpcf_tools.compute_redshift_tpcf(data_dir + filename_root, box, snapshot,
 			 r_bins, mu_bins, m_min = m_halo_min, num_threads = n_threads)
 
-'''
 
 print(f'Measuring first stage took {time.time() - t_init} seconds')
