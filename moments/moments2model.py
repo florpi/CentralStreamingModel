@@ -4,13 +4,14 @@ from halotools.mock_observables import tpcf_multipole
 from CentralStreamingModel.integral import real2redshift as real2red
 from CentralStreamingModel.skewt import skewt as st
 from CentralStreamingModel.skewt import skewt_moments
+from scipy.optimize import curve_fit
 
 
 
 
 class Model:
 
-	def __init__(self, rm, projected_moments, model):
+	def __init__(self, rm, projected_moments, model, p0 = None):
 
 		self.rm = rm
 
@@ -23,6 +24,7 @@ class Model:
 		sigma = np.sqrt(projected_moments[...,1])
 
 
+
 		if model == 'measured':
 
 			self.jointpdf_los = self.rm.jointpdf_los
@@ -33,14 +35,25 @@ class Model:
 			self.jointpdf_los = self.moments2gaussian(mean, sigma)
 			self.color = 'forestgreen'
 
+		elif model  == 'bf-gaussian':
+
+			self.jointpdf_los = self.bfgaussian()
+			self.color = 'darkseagreen'
+
 		elif model == 'st':
 			
 			gamma1 = projected_moments[..., 2]/sigma**3
 			gamma2 = projected_moments[..., 3]/sigma**4 - 3.
 
-			self.jointpdf_los = self.moments2st(mean, sigma, gamma1, gamma2)
+			self.params, self.jointpdf_los = self.moments2st(mean, sigma, gamma1, gamma2, p0)
+			self.color = 'royalblue'
+
+		elif model == 'bf-st':
+			
+			self.params, self.jointpdf_los = self.bfst()
 			self.color = 'indianred'
 
+	
 		self.multipoles(self.s, self.mu)
 
 	def moments2gaussian(self, mean, sigma):
@@ -48,19 +61,56 @@ class Model:
 		return norm.pdf(self.rm.v_los[np.newaxis, np.newaxis, :],
 				loc  = mean[...,np.newaxis],
 				scale = sigma[..., np.newaxis])
+	
+	def bfgaussian(self):
 
-	def moments2st(self, mean, sigma, gamma1, gamma2):
-
-		st_los = np.zeros_like(self.rm.jointpdf_los)
+		bf_gauss = np.zeros_like(self.rm.jointpdf_los)
 
 		for i, rperp in enumerate(self.rm.r_perp):
 			for j, rpar in enumerate(self.rm.r_parallel):
 
-				v_c, w, alpha, nu = skewt_moments.moments2parameters(mean[i,j], sigma[i,j], gamma1[i,j], gamma2[i,j])
+				popt, pcov = curve_fit(gaussian, self.rm.v_los, self.rm.jointpdf_los[i,j,:]) 
+						        
+				bf_gauss[i,j,:] = norm.pdf(self.rm.v_los, loc = popt[0], scale = popt[1])
 
-				st_los[i,j,:] = st.skewt_pdf(self.rm.v_los, w, v_c, alpha, nu)
+		return bf_gauss
 
-		return st_los
+
+
+	def moments2st(self, mean, sigma, gamma1, gamma2, p0 = None):
+
+		st_los = np.zeros_like(self.rm.jointpdf_los)
+		params = np.zeros((self.rm.jointpdf_los.shape[0], self.rm.jointpdf_los.shape[1], 4))
+
+		for i, rperp in enumerate(self.rm.r_perp):
+			for j, rpar in enumerate(self.rm.r_parallel):
+
+				#v_c, w, alpha, nu = skewt_moments.moments2parameters(mean[i,j], sigma[i,j], gamma1[i,j], gamma2[i,j])
+				if p0 is not None:
+					params[i,j,...] = skewt_moments.moments2parameters(mean[i,j], sigma[i,j], gamma1[i,j], gamma2[i,j], p0 = (p0[i,j,-2], p0[i,j,-1]))
+				else:
+					params[i,j,...] = skewt_moments.moments2parameters(mean[i,j], sigma[i,j], gamma1[i,j], gamma2[i,j])
+
+				st_los[i,j,:] = st.skewt_pdf(self.rm.v_los, params[i,j,1], params[i,j,0], params[i,j,2], params[i,j,-1])
+
+		return params, st_los
+
+	def bfst(self):
+
+		bf_st = np.zeros_like(self.rm.jointpdf_los)
+		params = np.zeros((self.rm.jointpdf_los.shape[0], self.rm.jointpdf_los.shape[1], 4))
+
+		for i, rperp in enumerate(self.rm.r_perp):
+			for j, rpar in enumerate(self.rm.r_parallel):
+
+				popt, pcov = curve_fit(st.skewt_pdf, self.rm.v_los, self.rm.jointpdf_los[i,j,:],
+						p0 = [5., 2., -0.2, 30.]) 
+						        
+				params[i,j ,...] = popt
+				bf_st[i,j,:] = st.skewt_pdf(self.rm.v_los, *popt)
+
+		return params, bf_st
+
 
 
 	def multipoles(self, s, mu):
@@ -82,10 +132,6 @@ class Model:
 
 		
 
-				
 
-
-
-
-
-
+def gaussian(v, mean, std):
+	    return norm.pdf(v, loc = mean, scale = std)

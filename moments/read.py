@@ -13,13 +13,16 @@ class mean_error:
 
 class Read_Mean:
 	
-	def __init__(self, n_boxes, boxsize, snapshot, tracer = 'halos'):
+	def __init__(self, n_boxes, boxsize, snapshot = 0, tracer = 'halos'):
 
 		boxes = range(1, n_boxes + 1)
 		boxsize = int(boxsize)
 		self.snapshot = snapshot
+		self.tracer = tracer
 
-		self.data_dir = '/raid/c-cuesta/tpcfs/'
+		#self.data_dir = '/raid/c-cuesta/tpcfs/'
+		self.data_dir = '/cosma6/data/dp004/dc-cues1/simulations/RSD/tpcfs/'
+
 
 		self.rt = []
 		self.los = []
@@ -31,7 +34,7 @@ class Read_Mean:
 
 		self.r = self.rt[0].r
 
-		max_v = 20
+		max_v = 40
 		threshold = (self.rt[0].v.r > -max_v) & (self.rt[0].v.r < max_v)
 		self.v_r = self.rt[0].v.r[threshold]
 		self.v_t = self.rt[0].v.t[threshold]
@@ -44,7 +47,7 @@ class Read_Mean:
 		self.r_perp = self.los[0].r.t
 		self.r_parallel = self.los[0].r.r
 		self.v_los = self.los[0].v
-		self.jointpdf_los, _ = self.compute_mean_error(self.los, 'jointpdf')
+		self.jointpdf_los, self.jointpdf_los_error = self.compute_mean_error(self.los, 'jointpdf')
 
 		self.tpcf_dict = self.read_real_tpcf(n_boxes)
 
@@ -55,7 +58,7 @@ class Read_Mean:
 
 		list_dictionaries = []
 		for i, box in enumerate(range(1, n_boxes + 1)):
-			real_tpcf = self.data_dir + f"real/box{100 + box}_s{self.snapshot:03d}.pickle"
+			real_tpcf = self.data_dir + f"real/{self.tracer}_b{box}.pickle"
 			with open(real_tpcf, "rb") as input_file:
 					list_dictionaries.append(pickle.load(input_file))
 					tpcfs = [dictionary['tpcf'] for dictionary in list_dictionaries]
@@ -70,7 +73,7 @@ class Read_Mean:
 
 		list_dictionaries = []
 		for i, box in enumerate(range(1, n_boxes + 1)):
-			redshift_tpcf = self.data_dir + f"redshift/box{100 + box}_s{self.snapshot:03d}.pickle"
+			redshift_tpcf = self.data_dir + f"redshift/{self.tracer}_b{box}.pickle"
 
 			with open(redshift_tpcf, "rb") as input_file:
 				list_dictionaries.append(pickle.load(input_file))

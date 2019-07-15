@@ -17,15 +17,18 @@ class components:
 
 
 class VD: 
-    def __init__(self, tracer, box, boxsize, snapshot):
+    def __init__(self, tracer, box, boxsize, snapshot, extra = None):
         self.tracer = tracer
         self.box = box
         self.boxsize = boxsize
         self.snapshot = snapshot
-        self.read_file()
-    def read_file(self):
+        self.read_file(extra)
+    def read_file(self, extra):
 
-        file_name = f'/cosma/home/dp004/dc-cues1/CentralPairwiseVels/results/{self.tracer}_b{self.box:1d}.txt'
+        if not extra:
+            file_name = f'/cosma/home/dp004/dc-cues1/CentralPairwiseVels/results/{self.tracer}_b{self.box:1d}.txt'
+        else:
+            file_name = f'/cosma/home/dp004/dc-cues1/CentralPairwiseVels/results/{self.tracer}_b{self.box:1d}_{extra}.txt'
 
         self.br, self.bvt, self.bvr, self.r, self.vt, self.vr, self.wvr, self.Npairs = np.loadtxt(file_name, unpack=True)
 

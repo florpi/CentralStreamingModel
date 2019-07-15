@@ -26,9 +26,9 @@ def constrains(x, gamma1, gamma2):
     alpha, nu = x
     return (gamma1_constrain(alpha, nu, gamma1), gamma2_constrain(alpha, nu, gamma2))
 
-def moments2parameters(mean, std, gamma1, gamma2):
+def moments2parameters(mean, std, gamma1, gamma2, p0 = (-1., 4.5)):
     
-    alpha, nu =  fsolve(constrains, (-0.7, 5), args = (gamma1, gamma2))
+    alpha, nu =  fsolve(constrains, p0, args = (gamma1, gamma2))
 
     delta = alpha / np.sqrt(1+alpha**2)
 
