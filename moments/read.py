@@ -20,7 +20,6 @@ class Read_Mean:
 		self.snapshot = snapshot
 		self.tracer = tracer
 
-		#self.data_dir = '/raid/c-cuesta/tpcfs/'
 		self.data_dir = '/cosma6/data/dp004/dc-cues1/simulations/RSD/tpcfs/'
 
 
