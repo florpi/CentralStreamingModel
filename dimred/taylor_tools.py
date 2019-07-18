@@ -3,27 +3,65 @@ import sympy as sym
 from scipy.interpolate import interp1d
 
 
+# ************ FITTING THE FIRST MOMENT ********************
 def m_1(r, a,c,d):
 
 	return a * r**(0.5) + c*r + d
-
-
-def c_2(r, a, b,c):
-
-	return a * r**b  + c
-
-def xi(r, a, b):
-	return (r/a)**(-b)
-
-def first_mu_prime(s, mu):
-	
-	return (1 - mu**2)/s
 
 def first_m1_dot(s, popt_m_r):
 
 	a, b, c = popt_m_r
 
 	return 0.5 * a/np.sqrt(s) + b
+
+def second_m1_dot(s, popt_m_r):
+
+    a, b, c = popt_m_r
+
+    return -1./4.* a * s**(-3./2.)
+
+
+
+# ************ FITTING THE SECOND MOMENT ********************
+def c_2(r, a, b,c):
+
+	return a * r**b  + c
+
+def first_dot_c(s, popt_c):
+
+    a, b, c = popt_c    
+
+    return a * b * s **(b-1)
+
+    
+def second_dot_c(s, popt_c):
+
+    a, b, c = popt_c    
+
+    return a * b * (b-1) * s **(b-2)
+
+
+#****** FITTING THE REAL SPACE CORRELATION FUNCTION *********
+def xi(r, a, b):
+	return (r/a)**(-b)
+
+def first_xi_dot(s, popt_xi):
+
+    a, b = popt_xi
+    
+    return - b * (s/a)**(-b) / s
+    
+def second_xi_dot(s, popt_xi):
+
+    a, b = popt_xi
+    
+    return b * (b + 1) * (s/a)**(-b)/s**2
+
+# *********** PRIME DERIVATIVES ************************
+
+def first_mu_prime(s, mu):
+	
+	return (1 - mu**2)/s
 
 def first_m1_prime(s, mu, popt_m_r):
     
@@ -37,12 +75,6 @@ def second_mu_prime(s, mu):
 def second_s_prime(s,mu):
 	
 	return (1 - mu**2)/s
-
-def second_m1_dot(s, popt_m_r):
-
-    a, b, c = popt_m_r
-
-    return -1./4.* a * s**(-3./2.)
 
 
 def second_m1_prime(s, mu, popt_m_r):
@@ -58,19 +90,6 @@ def m2(s, mu, popt_m_r, popt_c_r, popt_c_t):
 	return mu**2 * c_2(s, *popt_c_r) + (1-mu**2) * c_2(s, *popt_c_t) +\
             mu **2 *m_1(s, *popt_m_r)**2
       
-def first_dot_c(s, popt_c):
-
-    a, b, c = popt_c    
-
-    return a * b * s **(b-1)
-
-    
-def second_dot_c(s, popt_c):
-
-    a, b, c = popt_c    
-
-    return a * b * (b-1) * s **(b-2)
-
 def first_c2_prime(s, mu, popt_c_r, popt_c_t):
     
     return 2 * mu * first_mu_prime(s, mu)
@@ -99,18 +118,6 @@ def second_m2_prime(s, mu, popt_m_r, popt_c_r, popt_c_t):
     return second_c2_prime(s, mu, popt_c_r, popt_c_t) + \
             2 * first_m1_prime(s, mu, popt_m_r)**2 + \
             2 * mu * m_1(s, *popt_m_r) * second_m1_prime(s, mu, popt_m_r)
-
-def first_xi_dot(s, popt_xi):
-
-    a, b = popt_xi
-    
-    return - b * (s/a)**(-b) / s
-    
-def second_xi_dot(s, popt_xi):
-
-    a, b = popt_xi
-    
-    return b * (b + 1) * (s/a)**(-b)/s**2
 
 def first_xi_prime(s, mu, popt_xi):
     return mu * first_xi_dot(s, popt_xi)
