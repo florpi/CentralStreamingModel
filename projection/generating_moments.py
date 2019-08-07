@@ -100,7 +100,6 @@ def project_independent(ex, r_perp, r_parallel):
 			moments_projected[i,j, 1] = c_20(r_) * mu**2  \
 									+ c_02(r_) * (1 - mu**2)
 			
-			# Not assuming independence
 			moments_projected[i,j, 2] =  c_30(r_)  * mu**3  #\
 									#+ 3 * m_10(r_) * c_02(r_) * mu * (1 - mu**2) 
 			

@@ -13,7 +13,7 @@ class mean_error:
 
 class Read_Mean:
 	
-	def __init__(self, n_boxes, boxsize, snapshot = 0, tracer = 'halos'):
+	def __init__(self, n_boxes, boxsize, snapshot = 0, tracer = 'halos', mass = False):
 
 		boxes = range(1, n_boxes + 1)
 		boxsize = int(boxsize)
@@ -27,8 +27,14 @@ class Read_Mean:
 		self.los = []
 
 		for i, box in enumerate(boxes):
-			self.rt.append(VD(tracer, box, boxsize, snapshot))
-			self.los.append(VD_los(tracer, box, boxsize, snapshot))
+
+			if mass:
+				self.rt.append(VD(tracer, box, boxsize, snapshot, extra = mass))
+				self.los.append(VD_los(tracer, box, boxsize, snapshot, extra = mass))
+
+			else:
+				self.rt.append(VD(tracer, box, boxsize, snapshot))
+				self.los.append(VD_los(tracer, box, boxsize, snapshot))
 
 
 		self.r = self.rt[0].r
@@ -48,16 +54,20 @@ class Read_Mean:
 		self.v_los = self.los[0].v
 		self.jointpdf_los, self.jointpdf_los_error = self.compute_mean_error(self.los, 'jointpdf')
 
-		self.tpcf_dict = self.read_real_tpcf(n_boxes)
+		self.tpcf_dict = self.read_real_tpcf(n_boxes, mass)
 
-		self.read_redshift_tpcf(n_boxes)
+		self.read_redshift_tpcf(n_boxes, mass)
 
 
-	def read_real_tpcf(self, n_boxes): 
+	def read_real_tpcf(self, n_boxes, mass): 
 
 		list_dictionaries = []
 		for i, box in enumerate(range(1, n_boxes + 1)):
-			real_tpcf = self.data_dir + f"real/{self.tracer}_b{box}.pickle"
+			if mass:
+				real_tpcf = self.data_dir + f"real/{self.tracer}_b{box}_{mass}.pickle"
+			else:
+				real_tpcf = self.data_dir + f"real/{self.tracer}_b{box}.pickle"
+
 			with open(real_tpcf, "rb") as input_file:
 					list_dictionaries.append(pickle.load(input_file))
 					tpcfs = [dictionary['tpcf'] for dictionary in list_dictionaries]
@@ -68,11 +78,15 @@ class Read_Mean:
 
 		return mean_tpcf_dict
 
-	def read_redshift_tpcf(self, n_boxes):
+	def read_redshift_tpcf(self, n_boxes, mass):
 
 		list_dictionaries = []
 		for i, box in enumerate(range(1, n_boxes + 1)):
-			redshift_tpcf = self.data_dir + f"redshift/{self.tracer}_b{box}.pickle"
+			if mass:
+				redshift_tpcf = self.data_dir + f"redshift/{self.tracer}_b{box}_{mass}.pickle"
+			else:
+				redshift_tpcf = self.data_dir + f"redshift/{self.tracer}_b{box}.pickle"
+
 
 			with open(redshift_tpcf, "rb") as input_file:
 				list_dictionaries.append(pickle.load(input_file))

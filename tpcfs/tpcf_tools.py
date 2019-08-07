@@ -5,86 +5,97 @@ from scipy.interpolate import interp2d
 import pickle
 import h5py
 
-def compute_real_tpcf(tracer, box, r_bins, boxsize = 1024., num_threads = 16, m_min = 0., m_max =1.e17, gravity = 'GR'):
+def compute_real_tpcf(tracer, box, r_bins, boxsize = 1024., num_threads = 16,
+		m_min = 0., m_max =1.e17, gravity = 'GR', downsampling = None, extra = None):
 
 
 	hdf5_dir = '/cosma6/data/dp004/dc-cues1/simulations/RSD/'
 	filename = f'{tracer}_1024_b{box}.h5'
-	# if tracer == 'halos':
+	if extra:
+		filename = f'{tracer}_1024_b{box}_{extra}.h5'
+	if tracer == 'particles':
+		filename = f'{tracer}_1024.h5'
 
-		# simulation_path = f'/madfs/data/FR/Baojiu/fr_data/B1024-PM1024/gadget_data/2015/halo_catalogues/{gravity}/box{box}/38/'
-		# data_filename = f'Rockstar_M200c_{gravity}_B{box}_B1024_NP1024_S38.dat'
-		# m200c,x,y,z,vx,vy,vz,pid = np.loadtxt(simulation_path+ data_filename ,unpack=True, usecols = [2,8,9,10,11,12,13,-1])
-
-		# m_min = 8.e12
-		# threshold = (m200c > m_min) & (m200c < m_max) & (pid == -1) 
-	
-	# elif tracer == 'galaxies':
-		# simulation_path = '/cosma5/data/dp004/dc-hern1/GR_tests/catalogues/HOD_fixed_n_xi/'
-		# data_filename = f'{gravity}_HOD_z00_B{box:1d}.txt'
-
-		# x, y, z, vx, vy, vz, r200c, rs, m200c, type_id= np.loadtxt(simulation_path+ data_filename ,unpack=True)
-		# threshold = (m200c > m_min) & (m200c < m_max)
-
-	# pos = np.stack([x,y,z],axis=-1)
-	# pos = pos[threshold,:]
-	# print(pos.shape)
-	
 	with h5py.File( hdf5_dir + filename , 'r') as f:
 
 		pos = f['GroupPos'][:]
-	
+		if tracer != 'particles':
+			m200c = f['GroupMass'][:]
+			threshold = (m200c > m_min) & (m200c < m_max)
+			pos = pos[threshold,...]
+
+	if downsampling:
+
+		print(f'There are {pos.shape[0]} particles')
+		idx = np.random.randint(low = 0, high = pos.shape[0],
+				size = int(downsampling * pos.shape[0]))
+		pos = pos[idx, :]
+		print(f'Using {pos.shape[0]} particles')
+
 	real_tpcf = tpcf(pos, r_bins, period = boxsize, num_threads = num_threads)
+
+	del pos 
 
 	r_bins_c = 0.5*(r_bins[1:] + r_bins[:-1])
 
 	tpcf_dict = {'r': r_bins_c, 'tpcf': real_tpcf}
 
+	saveto = f'/cosma6/data/dp004/dc-cues1/simulations/RSD/tpcfs/real/{tracer}_b{box:1d}'
 
-	with open(f'/cosma6/data/dp004/dc-cues1/simulations/RSD/tpcfs/real/{tracer}_b{box:1d}.pickle', 'wb') as fp:
+	if m_min != 0.:
+		saveto += '_m2'
+
+	if m_max != 1.e17:
+		saveto += '_m1'
+
+	if downsampling is not None:
+		saveto += f'_d{downsampling}'
+
+	if extra:
+		saveto += '_' + extra
+
+	with open(saveto + '.pickle', 'wb') as fp:
+		print(f'Saving file to {saveto}')
 		pickle.dump(tpcf_dict, fp, protocol = pickle.HIGHEST_PROTOCOL)
 
 
 def compute_redshift_tpcf(tracer, box,	r_bins, mu_bins = None,
 						  m_min = 0., m_max = 1.e17, num_threads = 16, 
-						  los_direction=2, boxsize=1024., save = True, gravity = 'GR'):
+						  los_direction=2, boxsize=1024., save = True,
+						  gravity = 'GR', downsampling = None, extra = None):
 
 	lamda = 0.6844
 	matter = 1. - lamda
 
 	hdf5_dir = '/cosma6/data/dp004/dc-cues1/simulations/RSD/'
 	filename = f'{tracer}_1024_b{box}.h5'
+	if extra:
+		filename = f'{tracer}_1024_b{box}_{extra}.h5'
 
-	# if tracer == 'halos':
-
-		# simulation_path = f'/madfs/data/FR/Baojiu/fr_data/B1024-PM1024/gadget_data/2015/halo_catalogues/{gravity}/box{box}/38/'
-		# data_filename = f'Rockstar_M200c_{gravity}_B{box}_B1024_NP1024_S38.dat'
-
-
-		# m200c,x,y,z,vx,vy,vz,pid = np.loadtxt(simulation_path+ data_filename ,unpack=True, usecols = [2,8,9,10,11,12,13,-1])
-		# m_min = 8.e12
-		# threshold = (m200c > m_min) & (m200c < m_max) & (pid == -1) 
-	
-	# elif tracer == 'galaxies':
-		# simulation_path = '/cosma5/data/dp004/dc-hern1/GR_tests/catalogues/HOD_fixed_n_xi/'
-		# data_filename = f'{gravity}_HOD_z00_B{box:1d}.txt'
-
-		# x, y, z, vx, vy, vz, r200c, rs, m200c, type_id= np.loadtxt(simulation_path+ data_filename ,unpack=True)
-		# threshold = (m200c > m_min) & (m200c < m_max)
-
-	# pos = np.stack([x,y,z],axis=-1)
-	# vel = np.stack([vx,vy,vz],axis=-1)
-
-	# threshold = (m200c > m_min) & (m200c < m_max)
-
-	# pos = pos[threshold,:]
-	#vel = vel[threshold,:]
+	if tracer == 'particles':
+		filename = f'{tracer}_1024.h5'
 
 	with h5py.File( hdf5_dir + filename , 'r') as f:
 
 		pos = f['GroupPos'][:]
 		vel = f['GroupVel'][:]
-	
+
+		if tracer != 'particles':
+			m200c = f['GroupMass'][:]
+			threshold = (m200c > m_min) & (m200c < m_max)
+			pos = pos[threshold, :]
+			vel = vel[threshold, :]
+
+	if downsampling:
+
+		print(f'There are {pos.shape[0]} particles')
+		idx = np.random.randint(low = 0, high = pos.shape[0],
+				size = int(downsampling * pos.shape[0]))
+		pos = pos[idx, :]
+		vel = vel[idx, :]
+		print(f'Using {pos.shape[0]} particles')
+
+
 	s_pos = pos.copy()
 	
 	s_pos[:, los_direction] += vel[:, los_direction]/100. # to Mpc/h
@@ -102,6 +113,8 @@ def compute_redshift_tpcf(tracer, box,	r_bins, mu_bins = None,
 	
 	r_bins_c = 0.5*(r_bins[1:] + r_bins[:-1])
 
+	del pos, vel
+
 
 	pi_sigma = rp_pi_tpcf(s_pos, r_bins, r_bins, period=boxsize,
 				estimator=u'Landy-Szalay', num_threads=num_threads)
@@ -109,6 +122,7 @@ def compute_redshift_tpcf(tracer, box,	r_bins, mu_bins = None,
 	s_mu = s_mu_tpcf(s_pos, r_bins, mu_bins, period=boxsize,
 				estimator=u'Landy-Szalay', num_threads= num_threads)
 		
+	del m200c, s_pos, vel
 	mu_bins_c = 0.5 * (mu_bins[1:] + mu_bins[:-1])
 
 	mono = tpcf_multipole(s_mu, mu_bins, order = 0)
@@ -117,9 +131,24 @@ def compute_redshift_tpcf(tracer, box,	r_bins, mu_bins = None,
 
 	tpcf_dict = {'r': r_bins_c, 'mu_bins': mu_bins_c, 'pi_sigma': pi_sigma, 's_mu': s_mu,
 					'mono': mono, 'quad': quad, 'hexa': hexa}
+	saveto = f'/cosma6/data/dp004/dc-cues1/simulations/RSD/tpcfs/redshift/{tracer}_b{box:1d}'
+
+	if m_min != 0.:
+		saveto += '_m2'
+
+	if m_max != 1.e17:
+		saveto += '_m1'
+
+
+	if downsampling is not None:
+		saveto += f'_d{downsampling}'
+
+	if extra:
+		saveto += '_' + extra
+
 
 	if save == True:
-		with open(f'/cosma6/data/dp004/dc-cues1/simulations/RSD/tpcfs/redshift/{tracer}_b{box:1d}.pickle', 'wb') as fp:
+		with open(saveto + '.pickle', 'wb') as fp:
 			 pickle.dump(tpcf_dict, fp, protocol=pickle.HIGHEST_PROTOCOL)
 	else:
 		 return tpcf_dict

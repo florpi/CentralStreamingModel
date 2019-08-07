@@ -3,6 +3,7 @@ import numpy as np
 from joblib import Parallel, delayed
 import itertools
 from scipy.integrate import simps, quadrature, quad
+import quadpy
 
 # https://arxiv.org/abs/1710.09379 (Eq 22)
 
@@ -112,4 +113,60 @@ def compute_integrand_s_mu(s, mu, twopcf_dict, projected_pairwise_pdf,
 		
 		return y, result_integrand, pdf_contribution
 
+
+def integrand(s_c, mu_c, twopcf_function, los_pdf_function): 
+
+
+		#S, MU = np.meshgrid(s_c, mu_c)
+
+		def integrand(y):
+
+			#S_ravel = S.ravel().reshape(-1,1,1)
+			S = s_c.reshape(-1,1)
+			#MU_ravel = MU.ravel().reshape(-1,1,1)
+			MU = mu_c.reshape(1,-1)
+
+			s_parallel = S * MU
+
+			s_perp = S * np.sqrt(1 - MU**2)
+
+			r = np.sqrt(s_perp.reshape(-1, 1) **2 + y.reshape(1, -1) **2)
+
+			
+			return los_pdf_function( (s_parallel.reshape(-1, 1) - y.reshape(1, -1)) * np.sign(y.reshape(1, -1)),
+					s_perp.reshape(-1, 1), np.abs(y).reshape(1, -1)) * (1 + twopcf_function(r))
+
+		return integrand
+
+
+def quadpy_integrate(s, mu, twopcf_function, los_pdf_function, limit = 70.): 
+		#TODO : Fix quadpy
+
+		s_c = 0.5 * ( s[1:] + s[:-1] )
+		mu_c = 0.5 * ( mu[1:] + mu[:-1] )
+
+		streaming_integrand = integrand(s_c, mu_c, twopcf_function, los_pdf_function)
+
+		integral_negative, error = quadpy.line_segment.integrate_adaptive(streaming_integrand, [-limit, 0.], 1.e-10)
+		integral_negative = integral_negative.reshape((s_c.shape[0], mu_c.shape[0]))
+
+		integral_positive, error = quadpy.line_segment.integrate_adaptive(streaming_integrand, [0., limit], 1.e-10)
+		integral_positive = integral_positive.reshape((s_c.shape[0], mu_c.shape[0]))
+
+		return integral_negative + integral_positive - 1.
+
+def simps_integrate(s, mu, twopcf_function, los_pdf_function, limit = 70., epsilon = 0.0001, n = 500): 
+
+		s_c = 0.5 * ( s[1:] + s[:-1] )
+		mu_c = 0.5 * ( mu[1:] + mu[:-1] )
+
+		streaming_integrand = integrand(s_c, mu_c, twopcf_function, los_pdf_function)
+
+		r_test = np.linspace(-limit, -epsilon, n)
+		integral_left = simps(streaming_integrand(r_test), r_test, axis = -1).reshape((s_c.shape[0], mu_c.shape[0]))
+
+		r_test = np.linspace(epsilon, limit, n)
+		integral_right = simps(streaming_integrand(r_test), r_test, axis = -1).reshape((s_c.shape[0], mu_c.shape[0]))
+
+		return integral_left + integral_right - 1.
 

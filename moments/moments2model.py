@@ -5,15 +5,19 @@ from CentralStreamingModel.integral import real2redshift as real2red
 from CentralStreamingModel.skewt import skewt as st
 from CentralStreamingModel.skewt import skewt_moments
 from scipy.optimize import curve_fit
+from scipy.interpolate import interp1d
 
 
 
 
 class Model:
 
-	def __init__(self, rm, projected_moments, model, p0 = None):
+	def __init__(self, rm, expectations, projected_moments, model, p0 = None):
 
 		self.rm = rm
+		self.expectations = expectations
+		self.tpcf = interp1d(self.rm.tpcf_dict['r'], self.rm.tpcf_dict['tpcf'], kind = 'linear',
+                fill_value = (-1., self.rm.tpcf_dict['tpcf'][-1]), bounds_error = False)
 
 		self.s = np.arange(0., 50., 1.)
 		self.s_c = 0.5 * (self.s[1:] + self.s[:-1])
@@ -25,6 +29,7 @@ class Model:
 
 
 
+		mode = 'discrete'
 		if model == 'measured':
 
 			self.jointpdf_los = self.rm.jointpdf_los
@@ -32,8 +37,9 @@ class Model:
 
 		elif model  == 'gaussian':
 
-			self.jointpdf_los = self.moments2gaussian(mean, sigma)
+			self.jointpdf_los = self.moments2gaussian()
 			self.color = 'forestgreen'
+			mode = 'continuous'
 
 		elif model  == 'bf-gaussian':
 
@@ -54,13 +60,24 @@ class Model:
 			self.color = 'indianred'
 
 	
-		self.multipoles(self.s, self.mu)
+		self.multipoles(self.s, self.mu, mode)
 
-	def moments2gaussian(self, mean, sigma):
+	def moments2gaussian(self):
+		
+		def function_los(vlos, rperp, rparallel):
 
-		return norm.pdf(self.rm.v_los[np.newaxis, np.newaxis, :],
-				loc  = mean[...,np.newaxis],
-				scale = sigma[..., np.newaxis])
+			r = np.sqrt(rperp** 2 + rparallel** 2)
+			mu = rparallel/r
+			
+			mean_pi_sigma = mu * self.expectations.moment(1,0)(r)
+			
+			std_pi_sigma = np.sqrt( mu ** 2 * self.expectations.central_moment(2, 0 )(r) + \
+								  (1 - mu**2) * self.expectations.central_moment(0,2)(r))
+			
+			return norm.pdf(vlos, loc = mean_pi_sigma, scale = std_pi_sigma)
+
+		return function_los
+
 	
 	def bfgaussian(self):
 
@@ -113,14 +130,17 @@ class Model:
 
 
 
-	def multipoles(self, s, mu):
+	def multipoles(self, s, mu, mode):
 
-		rparallel, self.integrand, pdf_contribution = real2red.compute_integrand_s_mu(s,
-				                    mu, self.rm.tpcf_dict, self.jointpdf_los,
-									self.rm.r_perp, self.rm.r_parallel, self.rm.v_los)
+		if mode == 'discrete':
+			rparallel, self.integrand, pdf_contribution = real2red.compute_integrand_s_mu(s,
+										mu, self.rm.tpcf_dict, self.jointpdf_los,
+										self.rm.r_perp, self.rm.r_parallel, self.rm.v_los)
 
-		
-		self.s_mu = real2red.integrate(rparallel, self.integrand)
+			
+			self.s_mu = real2red.integrate(rparallel, self.integrand)
+		else:
+			self.s_mu = real2red.simps_integrate(self.s, self.mu, self.tpcf, self.jointpdf_los)
 
 		self.mono = tpcf_multipole(self.s_mu, mu, order = 0)
 		self.quad = tpcf_multipole(self.s_mu, mu, order = 2)

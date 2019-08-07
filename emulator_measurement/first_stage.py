@@ -29,7 +29,7 @@ n_threads = 16
 if tracer == 'halos':
 	r_bins = np.logspace(-0.4, np.log10(150.), 300)
 else:
-	r_bins = np.logspace(-4., np.log10(150.), 400)
+	r_bins = np.logspace(-0.4, np.log10(150.), 300)
 
 tpcf_tools.compute_real_tpcf(tracer, box, r_bins, num_threads = n_threads)
 
