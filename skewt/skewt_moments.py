@@ -44,6 +44,8 @@ def constrains_vectorized(x, gamma1, gamma2):
 
 	alpha, nu = x.reshape(2 , -1)
 
+	del x
+
 	return np.array([gamma1_constrain(alpha, nu, gamma1.ravel()), gamma2_constrain(alpha, nu, gamma2.ravel())]).ravel()
 
 def moments2parameters_vectorized(rperp_shape, rpar_shape, mean, std, gamma1, gamma2, p0 = (-1., 4.5)):
@@ -54,7 +56,13 @@ def moments2parameters_vectorized(rperp_shape, rpar_shape, mean, std, gamma1, ga
 
 	p0 = (p0_alpha, p0_nu)
 
-	alpha, nu =  fsolve(constrains_vectorized, p0, args = (gamma1, gamma2)).reshape((rperp_shape, rpar_shape, 2))
+
+
+	solution =  fsolve(constrains_vectorized, p0, args = (gamma1, gamma2)).reshape((2, rperp_shape, rpar_shape),
+			 xtol=1.49012e-05)
+
+	alpha = solution[0, ...]
+	nu = solution[1, ...]
 
 	delta = alpha / np.sqrt(1+alpha**2)
 

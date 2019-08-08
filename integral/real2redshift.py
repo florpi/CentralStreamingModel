@@ -128,11 +128,13 @@ def integrand(s_c, mu_c, twopcf_function, los_pdf_function):
 
 			s_parallel = S * MU
 
+
 			s_perp = S * np.sqrt(1 - MU**2)
+
 
 			r = np.sqrt(s_perp.reshape(-1, 1) **2 + y.reshape(1, -1) **2)
 
-			
+
 			return los_pdf_function( (s_parallel.reshape(-1, 1) - y.reshape(1, -1)) * np.sign(y.reshape(1, -1)),
 					s_perp.reshape(-1, 1), np.abs(y).reshape(1, -1)) * (1 + twopcf_function(r))
 
@@ -155,7 +157,7 @@ def quadpy_integrate(s, mu, twopcf_function, los_pdf_function, limit = 70.):
 
 		return integral_negative + integral_positive - 1.
 
-def simps_integrate(s, mu, twopcf_function, los_pdf_function, limit = 70., epsilon = 0.0001, n = 500): 
+def simps_integrate(s, mu, twopcf_function, los_pdf_function, limit = 70., epsilon = 0.0001, n = 300): 
 
 		s_c = 0.5 * ( s[1:] + s[:-1] )
 		mu_c = 0.5 * ( mu[1:] + mu[:-1] )

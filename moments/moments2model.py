@@ -5,17 +5,21 @@ from CentralStreamingModel.integral import real2redshift as real2red
 from CentralStreamingModel.skewt import skewt as st
 from CentralStreamingModel.skewt import skewt_moments
 from scipy.optimize import curve_fit
-from scipy.interpolate import interp1d
+from scipy.interpolate import interp1d, interp2d
+from CentralStreamingModel.projection import generating_moments
+from scipy.interpolate import RegularGridInterpolator
+
 
 
 
 
 class Model:
 
-	def __init__(self, rm, expectations, projected_moments, model, p0 = None):
+	def __init__(self, rm, expectations,  model, p0 = None):
 
 		self.rm = rm
 		self.expectations = expectations
+
 		self.tpcf = interp1d(self.rm.tpcf_dict['r'], self.rm.tpcf_dict['tpcf'], kind = 'linear',
                 fill_value = (-1., self.rm.tpcf_dict['tpcf'][-1]), bounds_error = False)
 
@@ -24,22 +28,18 @@ class Model:
 		self.mu = np.linspace(0., 1., 60)
 		self.mu_c = 0.5 * (self.mu[1:] + self.mu[:-1])
 
-		mean = projected_moments[...,0]
-		sigma = np.sqrt(projected_moments[...,1])
 
-
-
-		mode = 'discrete'
+		mode = 'continuous'
 		if model == 'measured':
 
-			self.jointpdf_los = self.rm.jointpdf_los
+			self.interpolator= self.interpolate_los_pdf()
+			self.jointpdf_los = self.measured_los_pdf()
 			self.color = 'black'
 
 		elif model  == 'gaussian':
 
 			self.jointpdf_los = self.moments2gaussian()
 			self.color = 'forestgreen'
-			mode = 'continuous'
 
 		elif model  == 'bf-gaussian':
 
@@ -48,20 +48,69 @@ class Model:
 
 		elif model == 'st':
 			
-			gamma1 = projected_moments[..., 2]/sigma**3
-			gamma2 = projected_moments[..., 3]/sigma**4 - 3.
-
 			self.jointpdf_los = self.moments2st()
 			self.color = 'royalblue'
-			mode = 'continuous'
 
 		elif model == 'bf-st':
 			
-			self.params, self.jointpdf_los = self.bfst()
+			self.jointpdf_los = self.bfst()
 			self.color = 'indianred'
 
 	
 		self.multipoles(self.s, self.mu, mode)
+
+	def interpolate_los_pdf(self):
+
+		return RegularGridInterpolator((self.rm.r_perp, self.rm.r_parallel, self.rm.v_los), 
+							self.rm.jointpdf_los,
+				            bounds_error = False, 
+							fill_value = 0.)
+
+	def measured_los_pdf(self):
+
+	
+		def function_los(v_los, r_perp, r_parallel):
+
+			v_bins = -1 * np.ones_like(v_los)
+
+			v_los_c = self.rm.v_los - 0.5 * (self.rm.v_los[1] - self.rm.v_los[0])
+			r_perp_c = self.rm.r_perp - 0.5 * (self.rm.r_perp[1] - self.rm.r_perp[0])
+			r_par_c = self.rm.r_parallel - 0.5 * (self.rm.r_parallel[1] - self.rm.r_parallel[0])
+
+			valid_mask = (v_los < np.max(v_los_c)) & (v_los > np.min(v_los_c))
+
+			v_bins = np.digitize(v_los, v_los_c) - 1
+
+			r_perp_bins = np.digitize(r_perp, r_perp_c) - 1
+
+			r_par_bins = np.digitize(np.abs(r_parallel), r_par_c) - 1
+
+
+
+			output = self.rm.jointpdf_los[r_perp_bins, r_par_bins, v_bins]
+
+			# Filter output for bounds
+			#output[valid_mask] = np.zeros_like(output[valid_mask])
+			filtered = np.where(valid_mask, output, 0.0)
+
+			return filtered 
+
+		return function_los
+
+		'''
+		v_los = v_los.flatten()
+		r_perp = r_perp.flatten()
+		r_parallel = r_parallel.flatten()
+
+		points = np.meshgrid(v_los, r_perp, r_parallel)
+		flat = np.array([m.flatten() for m in points])
+
+		out_array = self.interpolator(flat.T)
+
+
+		return out_array.reshape(*points[0].shape)
+		'''
+
 
 	def moments2gaussian(self):
 		
@@ -70,91 +119,118 @@ class Model:
 			r = np.sqrt(rperp** 2 + rparallel** 2)
 			mu = rparallel/r
 			
-			mean_pi_sigma = mu * self.expectations.moment(1,0)(r)
-			
-			std_pi_sigma = np.sqrt( mu ** 2 * self.expectations.central_moment(2, 0 )(r) + \
-								  (1 - mu**2) * self.expectations.central_moment(0,2)(r))
-			
-			return norm.pdf(vlos, loc = mean_pi_sigma, scale = std_pi_sigma)
+			mean, std, gamma1, gamma2 = generating_moments.project(self.expectations, r, mu)
+
+			return norm.pdf(vlos, loc = mean, scale = std)
 
 		return function_los
 
 	
 	def bfgaussian(self):
 
-		bf_gauss = np.zeros_like(self.rm.jointpdf_los)
+
+		popt = np.zeros((self.rm.r_perp.shape[0], 
+							self.rm.r_parallel.shape[0], 2))
 
 		for i, rperp in enumerate(self.rm.r_perp):
 			for j, rpar in enumerate(self.rm.r_parallel):
 
-				popt, pcov = curve_fit(gaussian, self.rm.v_los, self.rm.jointpdf_los[i,j,:]) 
+				popt[i,j, :], pcov = curve_fit(gaussian, self.rm.v_los, self.rm.jointpdf_los[i,j,:]) 
 						        
-				bf_gauss[i,j,:] = norm.pdf(self.rm.v_los, loc = popt[0], scale = popt[1])
 
-		return bf_gauss
+		print('Found optimal parameters')
+
+		#self.interpolators = []
+
+		#for i in range(popt.shape[-1]):
+		#	self.interpolators.append(interp2d(self.rm.r_parallel, self.rm.r_perp, popt[..., i], fill_value = popt[0,0,i]))
+
+		def function_los(vlos, rperp, rparallel):
+
+			r_perp_c = self.rm.r_perp - 0.5 * (self.rm.r_perp[1] - self.rm.r_perp[0])
+			r_par_c = self.rm.r_parallel - 0.5 * (self.rm.r_parallel[1] - self.rm.r_parallel[0])
+
+			r_perp_bins = np.digitize(rperp, r_perp_c) - 1
+			r_par_bins = np.digitize(np.abs(rparallel), r_par_c) - 1
+
+			mean = popt[r_perp_bins, r_par_bins, 0]
+			std = popt[r_perp_bins, r_par_bins, 1]
+
+			#mean = self.interpolators[0](rparallel[0, :], rperp[:,0])
+			#std = self.interpolators[1](rparallel[0,:], rperp[:,0])
+
+			return norm.pdf(vlos, loc =  mean, scale = std)
+
+		return function_los 
 
 
 
-	def moments2st(self, mean, sigma, gamma1, gamma2, p0 = None):
+	def moments2st(self): 
 
 		def function_los(vlos, rperp, rparallel):
 
 			r = np.sqrt(rperp** 2 + rparallel** 2)
 			mu = rparallel/r
-			
-			mean_pi_sigma = mu * self.expectations.moment(1,0)(r)
-			
-			std_pi_sigma = np.sqrt( mu ** 2 * self.expectations.central_moment(2, 0 )(r) + \
-								  (1 - mu**2) * self.expectations.central_moment(0,2)(r))
-			
-			return norm.pdf(vlos, loc = mean_pi_sigma, scale = std_pi_sigma)
+
+
+			mean, std, gamma1, gamma2 = generating_moments.project(self.expectations, r, mu)
+
+			v_c, w, alpha, nu = [np.zeros_like(mean) for _ in range(4)]
+
+			for i, rp in enumerate(range(mean.shape[0])):
+				for j, rpar in enumerate(range(mean.shape[1])):
+
+					v_c[i,j], w[i,j], alpha[i,j], nu[i,j] = skewt_moments.moments2parameters(
+																mean[i,j], std[i,j], gamma1[i,j], gamma2[i,j]
+																)
+
+			return st.skewt_pdf(vlos, w, v_c, alpha, nu)
 
 		return function_los
 
 
 
-
-
-
-
-
-
-
-
-
-		st_los = np.zeros_like(self.rm.jointpdf_los)
-		params = np.zeros((self.rm.jointpdf_los.shape[0], self.rm.jointpdf_los.shape[1], 4))
-
-		for i, rperp in enumerate(self.rm.r_perp):
-			for j, rpar in enumerate(self.rm.r_parallel):
-
-				#v_c, w, alpha, nu = skewt_moments.moments2parameters(mean[i,j], sigma[i,j], gamma1[i,j], gamma2[i,j])
-				if p0 is not None:
-					params[i,j,...] = skewt_moments.moments2parameters(mean[i,j], sigma[i,j], gamma1[i,j], gamma2[i,j], p0 = (p0[i,j,-2], p0[i,j,-1]))
-				else:
-					params[i,j,...] = skewt_moments.moments2parameters(mean[i,j], sigma[i,j], gamma1[i,j], gamma2[i,j])
-
-				st_los[i,j,:] = st.skewt_pdf(self.rm.v_los, params[i,j,1], params[i,j,0], params[i,j,2], params[i,j,-1])
-
-		return params, st_los
-
 	def bfst(self):
 
-		bf_st = np.zeros_like(self.rm.jointpdf_los)
-		params = np.zeros((self.rm.jointpdf_los.shape[0], self.rm.jointpdf_los.shape[1], 4))
+		self.popt = np.zeros((self.rm.r_perp.shape[0], 
+							self.rm.r_parallel.shape[0], 4))
+
 
 		for i, rperp in enumerate(self.rm.r_perp):
 			for j, rpar in enumerate(self.rm.r_parallel):
 
-				popt, pcov = curve_fit(st.skewt_pdf, self.rm.v_los, self.rm.jointpdf_los[i,j,:],
+				self.popt[i, j, :], pcov = curve_fit(st.skewt_pdf, self.rm.v_los, self.rm.jointpdf_los[i,j,:],
 						p0 = [5., 2., -0.2, 30.]) 
 						        
-				params[i,j ,...] = popt
-				bf_st[i,j,:] = st.skewt_pdf(self.rm.v_los, *popt)
+		print('Found optimal parameters')
 
-		return params, bf_st
+		#self.interpolators = []
+
+		#for i in range(self.popt.shape[-1]):
+		#	self.interpolators.append(interp2d(self.rm.r_parallel, self.rm.r_perp, self.popt[..., i]))
+
+		def function_los(vlos, rperp, rparallel):
+
+			r_perp_c = self.rm.r_perp - 0.5 * (self.rm.r_perp[1] - self.rm.r_perp[0])
+			r_par_c = self.rm.r_parallel - 0.5 * (self.rm.r_parallel[1] - self.rm.r_parallel[0])
+
+			r_perp_bins = np.digitize(rperp, r_perp_c) - 1
+			r_par_bins = np.digitize(np.abs(rparallel), r_par_c) - 1
+
+			w = self.popt[r_perp_bins, r_par_bins, 0]
+			v_c = self.popt[r_perp_bins, r_par_bins, 1]
+			gamma1 = self.popt[r_perp_bins, r_par_bins, 2]
+			gamma2 = self.popt[r_perp_bins, r_par_bins, 3]
 
 
+			#w = self.interpolators[0](rparallel[0,:], rperp[:,0])
+			#v_c = self.interpolators[1](rparallel[0,:], rperp[:,0])
+			#gamma1 = self.interpolators[2](rparallel[0,:], rperp[:,0])
+			#gamma2 = self.interpolators[3](rparallel[0,:], rperp[:,0])
+
+			return st.skewt_pdf(vlos, w, v_c, gamma1, gamma2)
+
+		return function_los 
 
 	def multipoles(self, s, mu, mode):
 
