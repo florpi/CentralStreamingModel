@@ -51,8 +51,9 @@ class Model:
 			gamma1 = projected_moments[..., 2]/sigma**3
 			gamma2 = projected_moments[..., 3]/sigma**4 - 3.
 
-			self.params, self.jointpdf_los = self.moments2st(mean, sigma, gamma1, gamma2, p0)
+			self.jointpdf_los = self.moments2st()
 			self.color = 'royalblue'
+			mode = 'continuous'
 
 		elif model == 'bf-st':
 			
@@ -95,6 +96,31 @@ class Model:
 
 
 	def moments2st(self, mean, sigma, gamma1, gamma2, p0 = None):
+
+		def function_los(vlos, rperp, rparallel):
+
+			r = np.sqrt(rperp** 2 + rparallel** 2)
+			mu = rparallel/r
+			
+			mean_pi_sigma = mu * self.expectations.moment(1,0)(r)
+			
+			std_pi_sigma = np.sqrt( mu ** 2 * self.expectations.central_moment(2, 0 )(r) + \
+								  (1 - mu**2) * self.expectations.central_moment(0,2)(r))
+			
+			return norm.pdf(vlos, loc = mean_pi_sigma, scale = std_pi_sigma)
+
+		return function_los
+
+
+
+
+
+
+
+
+
+
+
 
 		st_los = np.zeros_like(self.rm.jointpdf_los)
 		params = np.zeros((self.rm.jointpdf_los.shape[0], self.rm.jointpdf_los.shape[1], 4))

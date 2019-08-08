@@ -40,8 +40,38 @@ class Expectations:
         
         return interp1d(self.r, cov, bounds_error = False, fill_value = (cov[0], cov[-1]))
 
+def project(ex, r, mu):
 
-def project(ex, r_perp, r_parallel):
+	m_10 = ex.moment(1,0)
+	c_20 = ex.central_moment(2, 0)
+	c_02 = ex.central_moment(0, 2)
+	c_30 = ex.central_moment(3, 0)
+	c_12 = ex.central_moment(1,2)
+	c_22 = ex.central_moment(2, 2)
+	c_40 = ex.central_moment(4,0)
+	c_04 = ex.central_moment(0,4)
+
+
+	mean = m_10(r) * mu
+			
+	std = np.sqrt(c_20(r) * mu**2  \
+		+ c_02(r) * (1 - mu**2))
+			
+	skewness =  c_30(r)  * mu**3  \
+			+ 3 * c_12(r) * mu * (1 - mu**2) 
+			
+	gamma1 = skewness / std**3
+			
+	kurtosis = 6*c_22(r)  * mu**2 * (1 - mu**2) + \
+		c_40(r) * mu**4 +  c_04(r) * (1-mu**2)**2
+
+	gamma2 = kurtosis / std**4 - 3.
+		
+	return mean, std, gamma1, gamma2 
+	
+
+
+def project_vector(ex, r_perp, r_parallel):
 
 	m_10 = ex.moment(1,0)
 	c_20 = ex.central_moment(2, 0)
@@ -76,8 +106,9 @@ def project(ex, r_perp, r_parallel):
 		
 
 	return moments_projected
+
 				
-def project_independent(ex, r_perp, r_parallel):
+def project_independent_vector(ex, r_perp, r_parallel):
 
 	m_10 = ex.moment(1,0)
 	c_20 = ex.central_moment(2, 0)
