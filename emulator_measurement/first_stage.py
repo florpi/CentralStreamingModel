@@ -29,7 +29,7 @@ n_threads = 16
 if tracer == 'halos':
 	r_bins = np.logspace(-0.4, np.log10(150.), 300)
 else:
-	r_bins = np.logspace(-0.4, np.log10(150.), 300)
+	r_bins = np.logspace(-2., np.log10(120.), 200)
 
 tpcf_tools.compute_real_tpcf(tracer, box, r_bins, num_threads = n_threads)
 
@@ -37,7 +37,8 @@ r_bins = np.arange(0., 50., 1.)
 #r_bins = np.concatenate((np.arange(0.,10.,0.5), np.arange(10.,50.,1)))
 r_bins[0] = 0.0001
 n_mu_bins = 60
-mu_bins = np.linspace(0.,1.,n_mu_bins)
+mu_bins =  np.sort(1 - np.geomspace(0.0001, 1., n_mu_bins))
+#mu_bins = np.linspace(0.,1.,n_mu_bins)
 
 
 tpcf_tools.compute_redshift_tpcf(tracer, box, 

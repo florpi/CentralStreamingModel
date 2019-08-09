@@ -20,12 +20,20 @@ class Model:
 		self.rm = rm
 		self.expectations = expectations
 
-		self.tpcf = interp1d(self.rm.tpcf_dict['r'], self.rm.tpcf_dict['tpcf'], kind = 'linear',
-                fill_value = (-1., self.rm.tpcf_dict['tpcf'][-1]), bounds_error = False)
+		if rm.tracer == 'halos':
 
+			fill_value = ( -1., self.rm.tpcf_dict['tpcf'][-1])
+
+		else:
+
+			fill_value = (self.rm.tpcf_dict['tpcf'][0], self.rm.tpcf_dict['tpcf'][-1])
+
+		self.tpcf = interp1d(self.rm.tpcf_dict['r'], self.rm.tpcf_dict['tpcf'], kind = 'linear',
+                fill_value = fill_value, bounds_error = False)
+	
 		self.s = np.arange(0., 50., 1.)
 		self.s_c = 0.5 * (self.s[1:] + self.s[:-1])
-		self.mu = np.linspace(0., 1., 60)
+		self.mu =  np.sort(1 - np.geomspace(0.0001, 1., 60))
 		self.mu_c = 0.5 * (self.mu[1:] + self.mu[:-1])
 
 
@@ -164,13 +172,51 @@ class Model:
 		return function_los 
 
 
+	def moments2st(self): 
 
+		self.params = np.zeros((self.rm.r_perp.shape[0],
+						self.rm.r_parallel.shape[0],
+						4))
+
+		for i, rperp in enumerate(self.rm.r_perp):
+			for j, rpar in enumerate(self.rm.r_parallel):
+
+				r = np.sqrt(rperp** 2 + rpar** 2)
+
+				mu = np.abs(rpar)/r
+				mean, std, gamma1, gamma2 = generating_moments.project(self.expectations, r, mu)
+				
+				self.params[i,j,:] = skewt_moments.moments2parameters(
+																mean, std, gamma1, gamma2
+																)
+
+		print('Found params from moments')
+
+
+		def function_los(vlos, r_perp, r_parallel):
+
+			r_perp_c = self.rm.r_perp - 0.5 * (self.rm.r_perp[1] - self.rm.r_perp[0])
+			r_par_c = self.rm.r_parallel - 0.5 * (self.rm.r_parallel[1] - self.rm.r_parallel[0])
+
+			r_perp_bins = np.digitize(r_perp, r_perp_c) - 1
+			r_par_bins = np.digitize(np.abs(r_parallel), r_par_c) - 1
+
+			w = self.params[r_perp_bins, r_par_bins, 0]
+			v_c = self.params[r_perp_bins, r_par_bins, 1]
+			gamma1 = self.params[r_perp_bins, r_par_bins, 2]
+			gamma2 = self.params[r_perp_bins, r_par_bins, 3]
+
+			return st.skewt_pdf(vlos, w, v_c, gamma1, gamma2)
+
+		return function_los
+
+	'''
 	def moments2st(self): 
 
 		def function_los(vlos, rperp, rparallel):
-
 			r = np.sqrt(rperp** 2 + rparallel** 2)
 			mu = rparallel/r
+
 
 
 			mean, std, gamma1, gamma2 = generating_moments.project(self.expectations, r, mu)
@@ -187,6 +233,7 @@ class Model:
 			return st.skewt_pdf(vlos, w, v_c, alpha, nu)
 
 		return function_los
+	'''
 
 
 

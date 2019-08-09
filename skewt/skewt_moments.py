@@ -58,8 +58,7 @@ def moments2parameters_vectorized(rperp_shape, rpar_shape, mean, std, gamma1, ga
 
 
 
-	solution =  fsolve(constrains_vectorized, p0, args = (gamma1, gamma2)).reshape((2, rperp_shape, rpar_shape),
-			 xtol=1.49012e-05)
+	solution =  fsolve(constrains_vectorized, p0, args = (gamma1, gamma2)).reshape(2, rperp_shape, rpar_shape)
 
 	alpha = solution[0, ...]
 	nu = solution[1, ...]

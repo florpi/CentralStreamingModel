@@ -32,6 +32,8 @@ def compute_real_tpcf(tracer, box, r_bins, boxsize = 1024., num_threads = 16,
 		pos = pos[idx, :]
 		print(f'Using {pos.shape[0]} particles')
 
+	print(f'Using {pos.shape[0]} tracers to compute real space correlation function')
+
 	real_tpcf = tpcf(pos, r_bins, period = boxsize, num_threads = num_threads)
 
 	del pos 
@@ -116,13 +118,15 @@ def compute_redshift_tpcf(tracer, box,	r_bins, mu_bins = None,
 	del pos, vel
 
 
+	print(f'Using {s_pos.shape[0]} tracers to compute redshift space correlation function')
+
 	pi_sigma = rp_pi_tpcf(s_pos, r_bins, r_bins, period=boxsize,
 				estimator=u'Landy-Szalay', num_threads=num_threads)
 		
 	s_mu = s_mu_tpcf(s_pos, r_bins, mu_bins, period=boxsize,
 				estimator=u'Landy-Szalay', num_threads= num_threads)
 		
-	del m200c, s_pos, vel
+	del m200c, s_pos
 	mu_bins_c = 0.5 * (mu_bins[1:] + mu_bins[:-1])
 
 	mono = tpcf_multipole(s_mu, mu_bins, order = 0)
@@ -131,6 +135,7 @@ def compute_redshift_tpcf(tracer, box,	r_bins, mu_bins = None,
 
 	tpcf_dict = {'r': r_bins_c, 'mu_bins': mu_bins_c, 'pi_sigma': pi_sigma, 's_mu': s_mu,
 					'mono': mono, 'quad': quad, 'hexa': hexa}
+
 	saveto = f'/cosma6/data/dp004/dc-cues1/simulations/RSD/tpcfs/redshift/{tracer}_b{box:1d}'
 
 	if m_min != 0.:

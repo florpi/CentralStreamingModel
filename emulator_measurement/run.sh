@@ -6,5 +6,5 @@
 
 
 for box in {1..5}; do
-	python first_stage.py galaxies $box
+	python first_stage.py halos $box
 done
