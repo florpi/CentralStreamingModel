@@ -26,7 +26,7 @@ def constrains(x, gamma1, gamma2):
 	alpha, nu = x
 	return (gamma1_constrain(alpha, nu, gamma1), gamma2_constrain(alpha, nu, gamma2))
 
-def moments2parameters(mean, std, gamma1, gamma2, p0 = (-1., 4.5)):
+def moments2parameters(mean, std, gamma1, gamma2, p0 = (-0.7, 5)):
 	
 	alpha, nu =  fsolve(constrains, p0, args = (gamma1, gamma2))
 
@@ -48,7 +48,7 @@ def constrains_vectorized(x, gamma1, gamma2):
 
 	return np.array([gamma1_constrain(alpha, nu, gamma1.ravel()), gamma2_constrain(alpha, nu, gamma2.ravel())]).ravel()
 
-def moments2parameters_vectorized(rperp_shape, rpar_shape, mean, std, gamma1, gamma2, p0 = (-1., 4.5)):
+def moments2parameters_vectorized(rperp_shape, rpar_shape, mean, std, gamma1, gamma2, p0 = (-0.7, 5)):
 
 	
 	p0_alpha = p0[0] * np.ones((rperp_shape * rpar_shape))
