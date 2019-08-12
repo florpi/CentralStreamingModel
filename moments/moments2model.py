@@ -7,7 +7,10 @@ from CentralStreamingModel.skewt import skewt_moments
 from scipy.optimize import curve_fit
 from scipy.interpolate import interp1d, interp2d
 from CentralStreamingModel.projection import generating_moments
+from scipy.integrate import simps
 from scipy.interpolate import RegularGridInterpolator
+from CentralStreamingModel.pearson import pearson as ps
+from CentralStreamingModel.pearson import pearson_moments
 
 
 
@@ -15,7 +18,7 @@ from scipy.interpolate import RegularGridInterpolator
 
 class Model:
 
-	def __init__(self, rm, expectations,  model, p0 = None):
+	def __init__(self, rm, expectations,  model, direct = None, p0 = None):
 
 		self.rm = rm
 		self.expectations = expectations
@@ -46,7 +49,14 @@ class Model:
 
 		elif model  == 'gaussian':
 
-			self.jointpdf_los = self.moments2gaussian()
+			if direct is not None:
+				self.mean_r = direct[0]
+				self.c_r = direct[1]
+				self.c_t = direct[2]
+				self.jointpdf_los = self.moments2gaussian_direct()
+
+			else:
+				self.jointpdf_los = self.moments2gaussian()
 			self.color = 'forestgreen'
 
 		elif model  == 'bf-gaussian':
@@ -64,7 +74,12 @@ class Model:
 			self.jointpdf_los = self.bfst()
 			self.color = 'indianred'
 
-	
+		elif model == 'pearson':
+			
+			self.jointpdf_los = self.moments2pearson()
+			self.color = 'yellow'
+
+
 		self.multipoles(self.s, self.mu, mode)
 
 	def interpolate_los_pdf(self):
@@ -133,6 +148,21 @@ class Model:
 
 		return function_los
 
+	def moments2gaussian_direct(self):
+		
+		def function_los(vlos, rperp, rparallel):
+
+			r = np.sqrt(rperp** 2 + rparallel** 2)
+			mu = rparallel/r
+			
+			mean = mu * self.mean_r(r)
+			std = np.sqrt( self.c_r(r) * mu ** 2 + self.c_t(r) * (1 - mu**2))
+
+			return norm.pdf(vlos, loc = mean, scale = std)
+
+		return function_los
+
+	
 	
 	def bfgaussian(self):
 
@@ -174,6 +204,23 @@ class Model:
 
 	def moments2st(self): 
 
+
+		s = np.sqrt(self.rm.r_perp.reshape(-1, 1)**2 + self.rm.r_parallel.reshape(1, -1)**2)
+
+		mu = self.rm.r_parallel/s
+
+		#mean, std, gamma1, gamma2 = generating_moments.project(self.expectations, s, mu)
+
+		mean = simps(self.rm.v_los * self.rm.jointpdf_los, self.rm.v_los, axis = -1)
+
+		std = np.sqrt(simps( (self.rm.v_los - mean[..., np.newaxis])**2 * self.rm.jointpdf_los, self.rm.v_los, axis = -1))
+
+		gamma1 = simps( (self.rm.v_los - mean[..., np.newaxis])**3 * self.rm.jointpdf_los, self.rm.v_los, axis = -1)/std**3
+
+		gamma2 = simps( (self.rm.v_los - mean[..., np.newaxis])**4 * self.rm.jointpdf_los, self.rm.v_los, axis = -1)/std**4 - 3.
+
+
+
 		self.params = np.zeros((self.rm.r_perp.shape[0],
 						self.rm.r_parallel.shape[0],
 						4))
@@ -181,16 +228,14 @@ class Model:
 		for i, rperp in enumerate(self.rm.r_perp):
 			for j, rpar in enumerate(self.rm.r_parallel):
 
-				r = np.sqrt(rperp** 2 + rpar** 2)
-
-				mu = np.abs(rpar)/r
-				mean, std, gamma1, gamma2 = generating_moments.project(self.expectations, r, mu)
 				
 				self.params[i,j,:] = skewt_moments.moments2parameters(
-																mean, std, gamma1, gamma2
+																mean[i,j], std[i,j], gamma1[i,j], gamma2[i,j]
 																)
 
 		print('Found params from moments')
+
+
 
 
 		def function_los(vlos, r_perp, r_parallel):
@@ -201,8 +246,8 @@ class Model:
 			r_perp_bins = np.digitize(r_perp, r_perp_c) - 1
 			r_par_bins = np.digitize(np.abs(r_parallel), r_par_c) - 1
 
-			w = self.params[r_perp_bins, r_par_bins, 0]
-			v_c = self.params[r_perp_bins, r_par_bins, 1]
+			w = self.params[r_perp_bins, r_par_bins, 1]
+			v_c = self.params[r_perp_bins, r_par_bins, 0]
 			gamma1 = self.params[r_perp_bins, r_par_bins, 2]
 			gamma2 = self.params[r_perp_bins, r_par_bins, 3]
 
@@ -235,6 +280,66 @@ class Model:
 		return function_los
 	'''
 
+	def moments2pearson(self): 
+
+
+		s = np.sqrt(self.rm.r_perp.reshape(-1, 1)**2 + self.rm.r_parallel.reshape(1, -1)**2)
+
+		mu = self.rm.r_parallel/s
+
+		#mean, std, gamma1, gamma2 = generating_moments.project(self.expectations, s, mu)
+
+		mean = simps(self.rm.v_los * self.rm.jointpdf_los, self.rm.v_los, axis = -1)
+
+		std = np.sqrt(simps( (self.rm.v_los - mean[..., np.newaxis])**2 * self.rm.jointpdf_los, self.rm.v_los, axis = -1))
+
+		gamma1 = simps( (self.rm.v_los - mean[..., np.newaxis])**3 * self.rm.jointpdf_los, self.rm.v_los, axis = -1)/std**3
+
+		gamma2 = simps( (self.rm.v_los - mean[..., np.newaxis])**4 * self.rm.jointpdf_los, self.rm.v_los, axis = -1)/std**4 - 3.
+
+
+
+		self.params = np.zeros((self.rm.r_perp.shape[0],
+						self.rm.r_parallel.shape[0],
+						4))
+
+		for i, rperp in enumerate(self.rm.r_perp):
+			for j, rpar in enumerate(self.rm.r_parallel):
+
+				
+				self.params[i,j,:] = pearson_moments.moments2parameters(
+																mean[i,j], std[i,j], gamma1[i,j], gamma2[i,j], p0 = (3.,3.)
+																)
+
+		print('Found params from moments')
+
+
+		self.params[0,0,:] = self.params[1,1,:]
+
+
+
+		def function_los(vlos, r_perp, r_parallel):
+
+			r_perp_c = self.rm.r_perp - 0.5 * (self.rm.r_perp[1] - self.rm.r_perp[0])
+			r_par_c = self.rm.r_parallel - 0.5 * (self.rm.r_parallel[1] - self.rm.r_parallel[0])
+
+			r_perp_bins = np.digitize(r_perp, r_perp_c) - 1
+			r_par_bins = np.digitize(np.abs(r_parallel), r_par_c) - 1
+
+			lamda = self.params[r_perp_bins, r_par_bins, 0]
+			a = self.params[r_perp_bins, r_par_bins, 1]
+			m = self.params[r_perp_bins, r_par_bins, 2]
+			n = self.params[r_perp_bins, r_par_bins, 3]
+
+			n[n> 500] = 500
+
+			print(np.sum(n > 500))
+
+
+			return ps.pearson(vlos, lamda, a, m, n)
+
+		return function_los
+
 
 
 	def bfst(self):
@@ -246,8 +351,8 @@ class Model:
 		for i, rperp in enumerate(self.rm.r_perp):
 			for j, rpar in enumerate(self.rm.r_parallel):
 
-				self.popt[i, j, :], pcov = curve_fit(st.skewt_pdf, self.rm.v_los, self.rm.jointpdf_los[i,j,:],
-						p0 = [5., 2., -0.2, 30.]) 
+				self.popt[i, j, :], pcov = curve_fit(st.skewt_pdf, self.rm.v_los, self.rm.jointpdf_los[i,j,:])
+						#p0 = [5., 2., -0.2, 30.]) 
 						        
 		print('Found optimal parameters')
 
@@ -304,3 +409,4 @@ class Model:
 
 def gaussian(v, mean, std):
 	    return norm.pdf(v, loc = mean, scale = std)
+
